@@ -4,11 +4,12 @@
  * @LastEditors: Libra
  * @Description:
  */
-import { app, shell, BrowserWindow, protocol } from 'electron'
+import { app, shell, BrowserWindow, protocol, dialog, ipcMain } from 'electron'
 import path, { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { WindowManager } from './window-manager'
+import simpleGit from 'simple-git'
 
 function createWindow(): void {
   // Create the browser window.
@@ -49,6 +50,45 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// Add these handlers before createWindow()
+ipcMain.handle('select-directory', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  })
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    const path = result.filePaths[0]
+    // Verify it's a git repository
+    try {
+      const git = simpleGit(path)
+      const isRepo = await git.checkIsRepo()
+      if (!isRepo) {
+        throw new Error('Not a git repository')
+      }
+      return path
+    } catch (error) {
+      throw new Error('Invalid git repository')
+    }
+  }
+  return null
+})
+
+ipcMain.handle('get-commits', async (_, repoPath: string) => {
+  try {
+    const git = simpleGit(repoPath)
+    const log = await git.log()
+    return log.all.map((commit) => ({
+      hash: commit.hash,
+      date: commit.date,
+      message: commit.message,
+      author: `${commit.author_name} <${commit.author_email}>`
+    }))
+  } catch (error) {
+    console.error('Failed to get commits:', error)
+    throw error
+  }
+})
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

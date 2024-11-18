@@ -13,4 +13,5 @@ export interface WindowAPI {
   onUnmaximize: (callback: () => void) => void
   removeMaximizeListener: () => void
   removeUnmaximizeListener: () => void
+  selectDirectory: () => Promise<string | null>
 }
